@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	rpc = "https://1rpc.io/eth"
+	rpc = "https://rpc.ankr.com/eth_goerli"
 	// 根据pow挖矿前缀修改
 	prefix = "0x00000"
 	// 代表交易发起者愿意支付的最大优先费用（tip）。
@@ -30,7 +30,7 @@ var (
 	//如果矿工在指定的块空间内包含了交易，他们将收到这个费用。
 	gasTip = 3
 	//这个可以根据链上gas做为调整
-	gasMax = 50
+	gasMax = 35
 	tick   = "ierc-test"
 	amt    = 1000
 )
@@ -51,6 +51,7 @@ var (
 
 func main() {
 	privateKey, count := inputPrvAndCount()
+	println(privateKey)
 	hexData = fmt.Sprintf(`data:application/json,{"p":"ierc-20","op":"mint","tick":"%s","amt":"%d","nonce":"%%d"}`, tick, amt)
 	log.Infoln("ierc-20 pow mining begins...")
 	log.Infoln("Mining begins please wait ...")
@@ -134,7 +135,7 @@ func inputPrvAndCount() (privateKey string, count int) {
 		return "", 0
 	}
 
-	return privateKey, count
+	return "0x" + privateKey, count
 }
 
 func makeTx(cancelFunc context.CancelFunc, innerTx *types.DynamicFeeTx) {

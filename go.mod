@@ -1,9 +1,8 @@
-module github.com/minchenzz/ierc-miner
+module ierc-mining-go
 
 go 1.19
 
 require (
-	github.com/BurntSushi/toml v1.3.2
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/ethereum/go-ethereum v1.13.5
 	github.com/sirupsen/logrus v1.9.0

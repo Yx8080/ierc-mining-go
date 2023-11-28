@@ -1,7 +1,7 @@
-# IERC 多核挖矿程序
+# IERC
+出处: https://github.com/minchenzz/ierc-miner
 
-https://holesky.etherscan.io/address/0xd19162560690227c8f71a21b76129e1eb05575a9
-
+https://goerli.etherscan.io/address/0x67F657F66291B350bc9B75EAEF05E52FE229B794
 ### 使用方式
 
 1. 修改main.go中的代码配置
