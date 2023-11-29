@@ -1,4 +1,4 @@
-module ierc-mining-go
+module ierc-pow
 
 go 1.19
 
