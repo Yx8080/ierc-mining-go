@@ -42,11 +42,12 @@ var (
 	hexData   string
 )
 var (
-	globalNonce  = time.Now().UnixNano()
-	zeroAddress  = common.HexToAddress("0x0000000000000000000000000000000000000000")
-	chainID      = big.NewInt(0)
-	userNonce    = -1
+	globalNonce        = time.Now().UnixNano()
+	zeroAddress        = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	chainID            = big.NewInt(0)
+	userNonce    int64 = -1
 	successCount int64
+	hashCounter  sync.Map // 用于存储已提交的交易哈希
 )
 
 func main() {
@@ -56,8 +57,6 @@ func main() {
 	log.Infoln("ierc-20 pow mining begins...")
 	log.Infoln("Mining begins please wait ...")
 	log.Infoln(hexData)
-
-	defer submitSuccessfulLog()
 
 	var err error
 	ethClient, err = ethclient.Dial(rpc)
@@ -118,6 +117,11 @@ func main() {
 		}
 		wg.Wait()
 	}
+
+	submitSuccessfulLog()
+
+	log.Infoln("Ctrl+C exit...")
+	select {}
 }
 
 func inputPrvAndCount() (privateKey string, count int) {
@@ -144,26 +148,32 @@ func makeTx(cancelFunc context.CancelFunc, innerTx *types.DynamicFeeTx) {
 	innerTx.Data = []byte(temp)
 	tx := types.NewTx(innerTx)
 	signedTx, _ := types.SignTx(tx, types.NewCancunSigner(chainID), priv)
+
 	if strings.HasPrefix(signedTx.Hash().String(), prefix) {
-		log.WithFields(log.Fields{
-			"tx_hash": signedTx.Hash().String(),
-			"data":    temp,
-		}).Info("found new transaction")
-
-		err := ethClient.SendTransaction(context.Background(), signedTx)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"tx_hash": signedTx.Hash().String(),
-				"err":     err,
-			}).Error("failed to send transaction")
+		hash := signedTx.Hash().String()
+		// 检查交易哈希是否已经提交
+		if _, loaded := hashCounter.LoadOrStore(hash, 1); loaded {
+			// 如果哈希已经存在，则增加计数
+			count, ok := hashCounter.Load(hash)
+			if ok {
+				// 确保成功找到键
+				if countInt, ok := count.(int); ok {
+					hashCounter.Store(hash, countInt+1)
+				}
+			}
 		} else {
-			log.WithFields(log.Fields{
-				"tx_hash": signedTx.Hash().String(),
-			}).Info("broadcast transaction submitted successfully")
-			// 在成功提交交易时增加计数器
-			atomic.AddInt64(&successCount, 1)
+			err := ethClient.SendTransaction(context.Background(), signedTx)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"tx_hash": hash,
+					"err":     err,
+				}).Error("Transaction sending failure...")
+			} else {
+				log.Infoln(fmt.Sprintf("https://goerli.etherscan.io/tx/%s", hash))
+				// 在成功提交交易时增加计数器
+				atomic.AddInt64(&successCount, 1)
+			}
 		}
-
 		cancelFunc()
 	}
 }
@@ -174,13 +184,13 @@ func makeBaseTx() *types.DynamicFeeTx {
 		if err != nil {
 			panic(err)
 		}
-		userNonce = int(nonce)
+		atomic.StoreInt64(&userNonce, int64(nonce))
 	} else {
-		userNonce++
+		atomic.AddInt64(&userNonce, 1)
 	}
 	innerTx := &types.DynamicFeeTx{
 		ChainID:   chainID,
-		Nonce:     uint64(userNonce),
+		Nonce:     uint64(atomic.LoadInt64(&userNonce)),
 		GasTipCap: new(big.Int).Mul(big.NewInt(1000000000), big.NewInt(int64(gasTip))),
 		GasFeeCap: new(big.Int).Mul(big.NewInt(1000000000), big.NewInt(int64(gasMax))),
 		Gas:       30000 + uint64(rand.Intn(1000)),
@@ -193,4 +203,21 @@ func makeBaseTx() *types.DynamicFeeTx {
 
 func submitSuccessfulLog() {
 	log.Infof("Total number of successful transactions committed :%d", successCount)
+	// 打印重复的哈希和出现的次数
+	hashCounter.Range(func(key, value interface{}) bool {
+		hash, ok := key.(string)
+		if !ok {
+			log.Errorf("Invalid type for hash: %T", key)
+			return true
+		}
+
+		count, ok := value.(int)
+		if !ok {
+			log.Errorf("Invalid type for count: %T", value)
+			return true
+		}
+
+		log.Infof("Hash: %s, Count: %d", hash, count)
+		return true
+	})
 }
